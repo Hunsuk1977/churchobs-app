@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
+<key>CFBundleIdentifier</key><string>org.mmcnyc.churchobs</string>
+<key>CFBundleDevelopmentRegion</key><string>ko</string>
+<key>CFBundleLocalizations</key><array><string>ko</string><string>en</string></array>
+<key>CFBundleName</key><string>Church OBS</string>
+<key>CFBundleIconFile</key><string>ChurchOBS</string>
+<key>CFBundleDisplayName</key><string>Church OBS</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>0.8.0</string>
+<key>CFBundleVersion</key><string>18</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>NSHighResolutionCapable</key><true/>
+<key>CFBundleURLTypes</key><array><dict>
+<key>CFBundleURLName</key><string>app.churchobs.login</string>
+<key>CFBundleURLSchemes</key><array><string>churchobs</string></array>
+</dict></array>
+<key>NSCameraUsageDescription</key><string>예배 영상의 카메라 미리보기와 녹화를 위해 카메라를 사용합니다.</string>
+<key>NSAudioCaptureUsageDescription</key><string>앱 안에서 재생하는 유튜브 영상의 소리를 방송에 넣기 위해 사용합니다.</string>
+<key>NSMicrophoneUsageDescription</key><string>예배 영상에 소리를 녹음하기 위해 선택한 마이크를 사용합니다.</string>
+</dict></plist>

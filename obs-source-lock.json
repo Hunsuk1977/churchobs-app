@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/obsproject/obs-studio.git",
+  "tag": "32.2.2",
+  "commit": "ba2f32bdf791005443988a4955e963663e16b1ed",
+  "submodules": [
+    "8878638324393815512f802640b0d5ce940161f1 deps/libdshowcapture/src (8878638)",
+    " fe9630974d47f51bf54826e72fb8b654e620aa93 deps/libdshowcapture/src/external/capture-device-support (heads/main)",
+    " 3f0a2cdf378939ebe3c6f9ab36d4ea100c25aac2 plugins/obs-browser (3f0a2cd)",
+    " 1ef34bf48110c2a18184e50e41cd0b1a855e2147 plugins/obs-websocket (1ef34bf)"
+  ]
+}

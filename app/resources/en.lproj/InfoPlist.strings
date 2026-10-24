@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "Church OBS";
+"NSCameraUsageDescription" = "Church OBS uses the camera for the service preview, recording and streaming.";
+"NSMicrophoneUsageDescription" = "Church OBS uses the selected microphone to record and stream service audio.";

@@ -1,0 +1,10 @@
+Face detection regression fixture
+
+NASA portrait of astronaut Eileen Collins (public domain).
+Source image: scikit-image v0.25.2, skimage/data/astronaut.png
+https://github.com/scikit-image/scikit-image/blob/v0.25.2/skimage/data/astronaut.png
+https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.astronaut
+NASA portrait ID S99-00858 / GPN-2000-001177.
+
+Preparation: crop (96,0)-(416,240), resize 640x480, encode BGRA8.
+Only used by automated development tests. No endorsement implied.

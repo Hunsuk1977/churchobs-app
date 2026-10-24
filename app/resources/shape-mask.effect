@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Church OBS 모양 마스크: 소스를 (소수 단위로) 자르고 둥근 모서리·원·테두리를 입힌다.
+uniform float4x4 ViewProj;
+uniform texture2d image;
+uniform float2 uv_offset;
+uniform float2 uv_scale;
+uniform float2 size;
+uniform float radius;
+uniform float border;
+uniform float4 border_color;
+uniform float circle;
+sampler_state def_sampler {
+    Filter = Linear;
+    AddressU = Clamp;
+    AddressV = Clamp;
+};
+struct VertData { float4 pos : POSITION; float2 uv : TEXCOORD0; };
+VertData VSDefault(VertData v) {
+    VertData o;
+    o.pos = mul(float4(v.pos.xyz, 1.0), ViewProj);
+    o.uv = v.uv;
+    return o;
+}
+// 가장자리까지의 거리(픽셀). 안쪽은 음수
+float shape_distance(float2 uv) {
+    float2 half_size = size * 0.5;
+    float2 p = (uv - 0.5) * size;
+    if (circle > 0.5) {
+        float2 n = p / max(half_size, float2(1.0, 1.0));
+        return (length(n) - 1.0) * min(half_size.x, half_size.y);
+    }
+    float2 q = abs(p) - (half_size - radius);
+    return length(max(q, float2(0.0, 0.0))) + min(max(q.x, q.y), 0.0) - radius;
+}
+float4 PSMain(VertData v) : TARGET {
+    float4 c = image.Sample(def_sampler, uv_offset + v.uv * uv_scale);
+    float d = shape_distance(v.uv);
+    if (border > 0.0) {
+        float inner = saturate(0.5 - (d + border));
+        c = lerp(border_color, c, inner);
+    }
+    c.a *= saturate(0.5 - d);
+    return c;
+}
+technique Draw { pass { vertex_shader = VSDefault(v); pixel_shader = PSMain(v); } }

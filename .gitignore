@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.pyc
+vendor/
+build-macos/
+dist/
+logs/
+backups/
+signing.env
+app/resources/youtube-oauth.json

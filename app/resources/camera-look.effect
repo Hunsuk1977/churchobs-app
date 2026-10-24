@@ -1,0 +1,89 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Church OBS 카메라 룩: 4가지 자연스러운 색 톤 + 인물 분리 배경 흐림
+uniform float4x4 ViewProj;
+uniform texture2d image;        // 원본 (전체 해상도)
+uniform texture2d small_image;  // 1/4 크기로 줄인 원본 (배경 흐림용)
+uniform texture2d mask_image;   // 사람 = 1, 배경 = 0
+uniform float tone;             // 0 없음, 1 따뜻하게, 2 맑게, 3 차분하게, 4 필름
+uniform float tone_amount;      // 0..1
+uniform float blur;             // 0..1
+uniform float has_mask;
+uniform float2 small_texel;     // 1/작은 텍스처 크기
+sampler_state linear_sampler {
+    Filter = Linear;
+    AddressU = Clamp;
+    AddressV = Clamp;
+};
+struct VertData { float4 pos : POSITION; float2 uv : TEXCOORD0; };
+VertData VSDefault(VertData v) {
+    VertData o;
+    o.pos = mul(float4(v.pos.xyz, 1.0), ViewProj);
+    o.uv = v.uv;
+    return o;
+}
+float luma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
+float3 saturation(float3 c, float s) { float l = luma(c); return lerp(float3(l, l, l), c, s); }
+float3 contrast(float3 c, float k) { return (c - 0.5) * k + 0.5; }
+float3 grade(float3 c) {
+    float3 g = c;
+    if (tone < 1.5) {            // 따뜻하게: 무대 조명, 창백한 피부
+        g = c * float3(1.05, 1.0, 0.92);
+        g = saturation(g, 1.06);
+        g = g + (1.0 - g) * 0.02;
+    } else if (tone < 2.5) {     // 맑게: 밝고 깨끗한 흰색
+        g = c + (1.0 - c) * 0.07;
+        g = g * float3(0.98, 1.0, 1.03);
+        g = contrast(g, 1.05);
+        g = saturation(g, 1.04);
+    } else if (tone < 3.5) {     // 차분하게: 설교·기도
+        g = contrast(c, 0.9);
+        g = saturation(g, 0.85);
+        g = g + 0.015;
+    } else {                     // 필름: 부드러운 하이라이트, 은은한 색
+        float l = luma(c);
+        g = c + float3(0.03, 0.03, 0.035) * (1.0 - l);
+        g = g - g * g * 0.08;
+        g = g + float3(0.025, 0.01, -0.02) * l;
+        g = g + float3(-0.01, 0.0, 0.02) * (1.0 - l);
+        g = saturation(g, 0.9);
+    }
+    return saturate(lerp(c, g, tone_amount));
+}
+float person(float2 uv) { return smoothstep(0.3, 0.7, mask_image.Sample(linear_sampler, uv).r); }
+float3 blurred_background(float2 uv) {
+    // 줄인 화면에서 원형으로 모아 흐린다. 사람 쪽 색은 배경으로 번지지 않게 가중치를 낮춘다
+    float radius = blur * 9.0;
+    float3 sum = float3(0.0, 0.0, 0.0);
+    float total = 0.0;
+    for (int i = 0; i < 24; i++) {
+        float fi = float(i) + 0.5;
+        float r = sqrt(fi / 24.0) * radius;
+        float a = fi * 2.39996;
+        float2 suv = uv + float2(cos(a), sin(a)) * r * small_texel;
+        float w = 1.0 - person(suv) * 0.95;
+        sum += small_image.Sample(linear_sampler, suv).rgb * w;
+        total += w;
+    }
+    return sum / max(total, 0.0001);
+}
+float4 PSMain(VertData v) : TARGET {
+    float4 c = image.Sample(linear_sampler, v.uv);
+    float3 rgb = c.rgb;
+    if (blur > 0.001 && has_mask > 0.5) {
+        float p = person(v.uv);
+        if (p < 0.999) rgb = lerp(blurred_background(v.uv), rgb, p);
+    }
+    if (tone > 0.5 && tone_amount > 0.001) rgb = grade(rgb);
+    return float4(rgb, c.a);
+}
+// 1/4로 줄이기: 쌍선형 4번 = 4x4 평균
+uniform float2 full_texel;
+float4 PSDown(VertData v) : TARGET {
+    float4 s = image.Sample(linear_sampler, v.uv + full_texel * float2(-1.0, -1.0));
+    s += image.Sample(linear_sampler, v.uv + full_texel * float2(1.0, -1.0));
+    s += image.Sample(linear_sampler, v.uv + full_texel * float2(-1.0, 1.0));
+    s += image.Sample(linear_sampler, v.uv + full_texel * float2(1.0, 1.0));
+    return s * 0.25;
+}
+technique Draw { pass { vertex_shader = VSDefault(v); pixel_shader = PSMain(v); } }
+technique Down { pass { vertex_shader = VSDefault(v); pixel_shader = PSDown(v); } }

@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Face-local skin softening, restrained geometry and local feature contrast.
+uniform float4x4 ViewProj;
+uniform texture2d image;
+uniform float strength;
+uniform float2 pixel_size;
+uniform float comparison;
+uniform float show_guide;
+uniform float4 face_rect;
+uniform float4 left_eye;
+uniform float4 right_eye;
+uniform float4 left_brow;
+uniform float4 right_brow;
+uniform float4 mouth_rect;
+uniform float face_gain;
+uniform float4 details; // shape, eyes, brows, skin
+sampler_state linear_sampler {
+    Filter = Linear;
+    AddressU = Clamp;
+    AddressV = Clamp;
+};
+struct Vertex { float4 pos : POSITION; float2 uv : TEXCOORD0; };
+Vertex VSDefault(Vertex v) {
+    Vertex result;
+    result.pos = mul(float4(v.pos.xyz, 1.0), ViewProj);
+    result.uv = v.uv;
+    return result;
+}
+float skin_mask(float3 c) {
+    float y = dot(c, float3(0.299, 0.587, 0.114));
+    float cb = 0.5 + dot(c, float3(-0.168736, -0.331264, 0.5));
+    float cr = 0.5 + dot(c, float3(0.5, -0.418688, -0.081312));
+    float a = smoothstep(0.24, 0.31, cb) * (1.0 - smoothstep(0.50, 0.57, cb));
+    float b = smoothstep(0.47, 0.53, cr) * (1.0 - smoothstep(0.73, 0.81, cr));
+    return a * b * smoothstep(0.04, 0.14, y) * (1.0 - smoothstep(0.92, 1.0, y));
+}
+float3 weighted_sample(float2 uv, float3 center, out float weight) {
+    float3 sample_color = image.Sample(linear_sampler, uv).rgb;
+    float3 delta = sample_color - center;
+    weight = exp(-dot(delta, delta) * 45.0);
+    return sample_color * weight;
+}
+float ellipse(float2 uv, float4 rect, float expand) {
+    float2 delta=(uv-rect.xy)/max(rect.zw*expand,float2(0.0001,0.0001));
+    return 1.0-smoothstep(0.55,1.0,dot(delta,delta));
+}
+float2 enlarge_eye(float2 uv, float4 rect, float amount) {
+    float2 radius=float2(rect.z*1.9, max(rect.w*2.8,rect.z*0.65));
+    float2 delta=(uv-rect.xy)/max(radius,float2(0.0001,0.0001));
+    float weight=1.0-smoothstep(0.0,1.0,dot(delta,delta));
+    return uv-(uv-rect.xy)*(amount*0.12*weight*weight);
+}
+float guide_ring(float2 uv, float4 rect) {
+    float2 d=abs((uv-rect.xy)/max(rect.zw,float2(0.0001,0.0001)));
+    float edge=max(d.x,d.y);
+    return smoothstep(0.965,0.98,edge)*(1.0-smoothstep(1.0,1.015,edge));
+}
+float4 PSMain(Vertex v) : TARGET {
+    // Each half displays the SAME central half-width crop, without stretching.
+    // Panel centres (0.25 and 0.75) both sample source x=0.5.
+    float2 source_uv = v.uv;
+    if (comparison > 0.5) {
+        source_uv.x = v.uv.x < 0.5 ? v.uv.x + 0.25 : v.uv.x - 0.25;
+    }
+    float4 center = image.Sample(linear_sampler, source_uv);
+    // The original pane never passes through geometry, skin or diagnostic paint.
+    if (comparison > 0.5 && v.uv.x < 0.5) return center;
+    if(show_guide>0.5 && face_gain>0.05) {
+        float ring=max(guide_ring(source_uv,face_rect),max(guide_ring(source_uv,left_eye),guide_ring(source_uv,right_eye)));
+        if(ring>0.01) return float4(lerp(center.rgb,float3(0.15,0.95,0.55),ring),center.a);
+    }
+    if(face_gain < 0.0001) return center;
+    float power=face_gain*strength;
+    float2 uv=source_uv;
+    float2 f=(uv-face_rect.xy)/max(face_rect.zw,float2(0.0001,0.0001));
+    float lower=smoothstep(-0.25,0.3,f.y)*(1.0-smoothstep(0.75,1.1,f.y));
+    float boundary=1.0-smoothstep(0.65,1.35,abs(f.x));
+    // Inverse mapping pulls the cheek contour inward, with zero offset at center.
+    uv.x+=(uv.x-face_rect.x)*(0.10*details.x*power*lower*boundary);
+    uv=enlarge_eye(uv,left_eye,details.y*power);
+    uv=enlarge_eye(uv,right_eye,details.y*power);
+    center=image.Sample(linear_sampler,uv);
+    float3 sum = center.rgb;
+    float total = 1.0;
+    float weight;
+    sum += weighted_sample(uv + pixel_size * float2(-1.0, -1.0), center.rgb, weight); total += weight;
+    sum += weighted_sample(uv + pixel_size * float2( 0.0, -1.0), center.rgb, weight); total += weight;
+    sum += weighted_sample(uv + pixel_size * float2( 1.0, -1.0), center.rgb, weight); total += weight;
+    sum += weighted_sample(uv + pixel_size * float2(-1.0,  0.0), center.rgb, weight); total += weight;
+    sum += weighted_sample(uv + pixel_size * float2( 1.0,  0.0), center.rgb, weight); total += weight;
+    sum += weighted_sample(uv + pixel_size * float2(-1.0,  1.0), center.rgb, weight); total += weight;
+    sum += weighted_sample(uv + pixel_size * float2( 0.0,  1.0), center.rgb, weight); total += weight;
+    sum += weighted_sample(uv + pixel_size * float2( 1.0,  1.0), center.rgb, weight); total += weight;
+    float eyeMask=max(ellipse(uv,left_eye,1.7),ellipse(uv,right_eye,1.7));
+    float browMask=max(ellipse(uv,left_brow,1.5),ellipse(uv,right_brow,1.5));
+    float protectedMask=max(max(eyeMask,browMask),ellipse(uv,mouth_rect,1.5));
+    float mask = skin_mask(center.rgb)*ellipse(uv,face_rect,1.05)*(1.0-protectedMask)*face_gain;
+    float3 softened = lerp(center.rgb, sum / total, strength * details.w * mask);
+    // Small skin-only lift; this is not a full-frame exposure adjustment.
+    float3 lifted = softened + (1.0 - softened) * (0.035 * strength * details.w * mask);
+    float3 localBlur=(image.Sample(linear_sampler,uv+float2(pixel_size.x*0.35,0.0)).rgb
+                 +image.Sample(linear_sampler,uv-float2(pixel_size.x*0.35,0.0)).rgb
+                 +image.Sample(linear_sampler,uv+float2(0.0,pixel_size.y*0.35)).rgb
+                 +image.Sample(linear_sampler,uv-float2(0.0,pixel_size.y*0.35)).rgb)*0.25;
+    float feature=(eyeMask*details.y+browMask*details.z)*power;
+    lifted+=(center.rgb-localBlur)*(feature*0.8);
+    // Enhance existing dark brow hairs; do not paint a replacement eyebrow.
+    float hair=1.0-smoothstep(0.18,0.50,dot(center.rgb,float3(0.299,0.587,0.114)));
+    lifted*=1.0-browMask*hair*details.z*power*0.12;
+    return float4(saturate(lifted), center.a);
+}
+technique Draw { pass { vertex_shader = VSDefault(v); pixel_shader = PSMain(v); } }
