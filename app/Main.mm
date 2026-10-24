@@ -267,9 +267,16 @@ static NSStackView *column(NSArray<NSView *> *views) {
 }
 - (void)showAbout:(id)sender {
     (void)sender; NSAlert *alert = [NSAlert new];
-    alert.messageText = @"Church OBS 0.8.0";
-    alert.informativeText = WSL(@"OBS libobs 기반 독립 프런트엔드 개발 버전입니다.\nGPL-2.0-or-later · 엔진 및 앱 소스 포함.\nMac 빌드·카메라·셰이더의 실제 실행 검증이 필요합니다.");
-    [alert runModal];
+    NSString *version=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"";
+    NSString *build=[NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleVersion"] ?: @"";
+    alert.messageText = [NSString stringWithFormat:@"Church OBS %@ (%@)",version,build];
+    alert.informativeText = WSL(@"교회를 위한 간편 YouTube 방송 소프트웨어\n\nOBS Studio 엔진(libobs 32.2.2) 기반 · GPL-2.0-or-later 자유 소프트웨어입니다.\n소스 코드와 오픈소스 고지: github.com/Hunsuk1977/churchobs-app\nOBS Project와는 관계없는 독립 프로젝트입니다.");
+    [alert addButtonWithTitle:WSL(@"확인")];
+    [alert addButtonWithTitle:WSL(@"소스 코드 보기")];
+    [alert addButtonWithTitle:WSL(@"개인정보 처리방침")];
+    NSModalResponse response=[alert runModal];
+    if(response==NSAlertSecondButtonReturn) [NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:@"https://github.com/Hunsuk1977/churchobs-app"]];
+    else if(response==NSAlertThirdButtonReturn) [NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:@"https://churchobs.app/privacy"]];
 }
 - (void)reportFailure {
     self.errorLabel.stringValue = self.engine.lastError;

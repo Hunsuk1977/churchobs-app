@@ -1163,3 +1163,6 @@
 "프로젝터·다른 모니터에 전체 화면" = "Full screen on a projector or other monitor";
 "연결된 프로젝터·모니터가 없습니다" = "No projector or other monitor connected";
 "출력 창: 현장 프로젝터·다른 모니터에 전체 화면으로, 또는 이 화면에 별도 창으로 띄웁니다. 송출 화면 그대로 또는 고른 장면을 보낼 수 있습니다. 전체 화면은 Esc 대신 이 메뉴에서 닫습니다." = "Output window: full screen on the room projector or another monitor, or as a window on this screen. Send the stream as is or a chosen scene. Close full screen from this menu instead of Esc.";
+"교회를 위한 간편 YouTube 방송 소프트웨어\n\nOBS Studio 엔진(libobs 32.2.2) 기반 · GPL-2.0-or-later 자유 소프트웨어입니다.\n소스 코드와 오픈소스 고지: github.com/Hunsuk1977/churchobs-app\nOBS Project와는 관계없는 독립 프로젝트입니다." = "Simple YouTube streaming for churches\n\nBuilt on the OBS Studio engine (libobs 32.2.2) · free software under GPL-2.0-or-later.\nSource code and open source notices: github.com/Hunsuk1977/churchobs-app\nAn independent project, not affiliated with the OBS Project.";
+"소스 코드 보기" = "View source code";
+"개인정보 처리방침" = "Privacy Policy";
