@@ -14,6 +14,8 @@ struct ChurchStudioView: View {
     @AppStorage("gate.developerContinue") private var developerContinue = false
     @AppStorage("ui.cameraPanelOpen") private var cameraPanelOpen = true
     @AppStorage("ui.wordaliveStudio") private var showWordaliveStudio = true
+    /// WORDaLIVE 스튜디오를 쓸 때 오른쪽 송출 기둥을 펼쳐 둘지 (기본: 접어서 스튜디오가 거의 전체 화면)
+    @AppStorage("ui.broadcastDrawer") private var broadcastDrawerOpen = false
     @AppStorage("ui.materialMonitor") private var showMaterialMonitor = false
     @State private var beautyCompare = false
     @State private var showBeautyDetail = false
@@ -467,16 +469,33 @@ struct ChurchStudioView: View {
     private var performanceBody: some View {
         Group {
             if studioVisible {
-                HStack(alignment: .top, spacing: 14) {
+                // 스튜디오가 상단(헤더)만 빼고 거의 전체를 차지한다. 송출 기둥은 오른쪽 서랍 —
+                // 접으면 얇은 레일(송출 전환·LIVE·마이크)만 남고, 펼치면 380pt 기둥이 된다.
+                HStack(alignment: .top, spacing: broadcastDrawerOpen ? 12 : 0) {
                     WordaliveStudioPane {
                         withAnimation(.snappy(duration: 0.25)) { showWordaliveStudio = false }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    compactPerformance
+                    if broadcastDrawerOpen {
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text("송출").font(.uiCaption.weight(.semibold)).foregroundStyle(.secondary)
+                                Spacer()
+                                Button { withAnimation(.snappy(duration: 0.25)) { broadcastDrawerOpen = false } } label: { Image(systemName: "chevron.right") }
+                                    .buttonStyle(.borderless).help(L("송출 패널 접기"))
+                            }
+                            .padding(.bottom, 6)
+                            compactPerformance
+                        }
                         .frame(width: 380)
                         .frame(maxHeight: .infinity, alignment: .top)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                    } else {
+                        broadcastRail
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
                 }
-                .padding(.horizontal, 18).padding(.vertical, 14)
+                .padding(.leading, 10).padding(.trailing, broadcastDrawerOpen ? 14 : 0).padding(.vertical, 8)
             } else {
                 HStack(alignment: .top, spacing: 0) {
                     // 숨긴 스튜디오는 왼쪽 가장자리의 얇은 탭으로 다시 연다
@@ -485,6 +504,55 @@ struct ChurchStudioView: View {
                 }
             }
         }
+    }
+
+    /// 송출 기둥을 접었을 때 오른쪽 가장자리의 얇은 레일: 펼치기·송출 전환·LIVE·마이크
+    private var broadcastRail: some View {
+        VStack(spacing: 14) {
+            Button { withAnimation(.snappy(duration: 0.25)) { broadcastDrawerOpen = true } } label: {
+                VStack(spacing: 8) {
+                    Image(systemName: "chevron.left").font(.uiCaption2.weight(.bold)).foregroundStyle(.secondary)
+                    Image(systemName: "sidebar.right").font(.system(size: 15, weight: .semibold))
+                    Text("송출")
+                        .font(.uiCaption.weight(.semibold))
+                        .fixedSize()
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 18, height: 40)
+                }
+                .frame(width: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(L("송출 패널 펼치기 — 미리보기·전환·장면"))
+            Divider().frame(width: 28)
+            // 송출 전환 (미리보기 → 송출)
+            Button { session.store.take() } label: {
+                Image(systemName: "arrow.right.to.line").font(.system(size: 15, weight: .bold))
+                    .frame(width: 34, height: 34)
+            }
+            .churchButton()
+            .disabled(session.store.previewSceneID == nil)
+            .help(L("송출 전환 (미리보기 장면을 방송으로)"))
+            if session.flag("live") {
+                Image(systemName: "dot.radiowaves.left.and.right").foregroundStyle(.red).font(.uiCaption.bold()).help("LIVE")
+            } else if session.flag("recording") {
+                Image(systemName: "record.circle").foregroundStyle(.red).font(.uiCaption.bold()).help(L("녹화 중"))
+            }
+            Spacer()
+            // 마이크 레벨 (세로)
+            LevelMeter(value: microphoneLevel, segments: 12, showsDB: false)
+                .frame(width: 80, height: 10)
+                .rotationEffect(.degrees(-90))
+                .frame(width: 10, height: 80)
+            Image(systemName: session.flag("muted") ? "mic.slash.fill" : "mic.fill")
+                .font(.uiCaption).foregroundStyle(session.flag("muted") ? .red : .secondary)
+                .padding(.bottom, 8)
+        }
+        .padding(.top, 8)
+        .frame(width: 44)
+        .frame(maxHeight: .infinity)
+        .background(Color.secondary.opacity(0.08))
+        .overlay(alignment: .leading) { Rectangle().fill(Color.secondary.opacity(0.18)).frame(width: 1) }
     }
 
     /// 스튜디오를 숨겼을 때 왼쪽 가장자리 탭

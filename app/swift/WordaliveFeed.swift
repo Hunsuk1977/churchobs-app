@@ -110,6 +110,83 @@ final class WordaliveFeed {
     @ObservationIgnored private var prunedStore = false
     @ObservationIgnored private var deckIDSignature = ""
 
+    // 보관함의 그림이 WORDaLIVE 쪽에서 같은 주소로 새로 구워졌을 수 있다(디자인 수정, 번역 줄
+    // 스타일 변경) → 덱을 받을 때마다 ETag로 확인해 바뀐 것만 다시 받는다. 주소(경로)만으로
+    // 키를 잡기 때문에 이 확인이 없으면 옛 그림이 60일 동안 남는다.
+    @ObservationIgnored private var etags: [String: String] = {
+        let url = WordaliveFeed.slideFolder.appendingPathComponent("etags.json")
+        return (try? JSONDecoder().decode([String: String].self, from: Data(contentsOf: url))) ?? [:]
+    }()
+    private func saveEtags() {
+        let url = Self.slideFolder.appendingPathComponent("etags.json")
+        try? JSONEncoder().encode(etags).write(to: url)
+    }
+    /// 보관함에 있는 그림 수 (화면 표시용)
+    private(set) var storedCount = 0
+    private(set) var revalidating = false
+    private(set) var lastRefresh: Date?
+    func refreshStoredCount() {
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: Self.slideFolder.path)) ?? []
+        storedCount = files.filter { $0.hasSuffix(".png") || $0.hasSuffix(".img") }.count
+    }
+    /// 보관함 비우기 — 다음 덱부터 전부 새로 받는다
+    func clearStore() {
+        deckTask?.cancel(); deckTaskDone = true
+        for file in (try? FileManager.default.contentsOfDirectory(at: Self.slideFolder, includingPropertiesForKeys: nil)) ?? [] {
+            try? FileManager.default.removeItem(at: file)
+        }
+        slideFiles = [:]; etags = [:]; slidesReady = 0; storedCount = 0; deckIDSignature = ""
+        lastSlideSent = ""
+        showCurrentSlide()
+        if !slideIDs.isEmpty {
+            let ids = slideIDs
+            deckTaskDone = false
+            deckTask = Task { [weak self] in await self?.downloadAll(ids); self?.deckTaskDone = true }
+        }
+    }
+    static var storeFolder: URL { slideFolder }
+    /// 이미 받은 그림이 서버에서 바뀌었는지 확인하고(ETag) 바뀐 것만 다시 받는다. force = 전부 다시
+    func revalidateStored(force: Bool = false) {
+        let ids = slideIDs.filter { slideFiles[$0] != nil && slideURLs[$0] != nil }
+        guard !ids.isEmpty, !revalidating else { return }
+        revalidating = true
+        Task { [weak self] in
+            guard let self else { return }
+            var changed = 0
+            for id in ids {
+                if Task.isCancelled { break }
+                if await self.redownloadIfChanged(id, force: force) { changed += 1 }
+            }
+            self.revalidating = false
+            self.lastRefresh = Date()
+            self.refreshStoredCount()
+            if changed > 0 {
+                NSLog("[wordalive] %ld slide(s) re-downloaded (changed on server)", changed)
+                self.lastSlideSent = ""   // 같은 경로라도 그림이 바뀌었으니 엔진에 다시 보낸다
+                self.showCurrentSlide()
+            }
+        }
+    }
+    /// 서버 ETag가 다르면(또는 force) 그림을 새로 받는다. 받았으면 true
+    private func redownloadIfChanged(_ id: String, force: Bool) async -> Bool {
+        guard let url = slideURLs[id] else { return false }
+        var request = URLRequest(url: url)
+        if !force, let tag = etags[id] { request.setValue(tag, forHTTPHeaderField: "If-None-Match") }
+        do {
+            let (temp, response) = try await Self.downloader.download(for: request)
+            guard let http = response as? HTTPURLResponse else { return false }
+            if http.statusCode == 304 { return false }
+            guard http.statusCode == 200 else { return false }
+            let safe = id.replacingOccurrences(of: "/", with: "_")
+            let target = Self.slideFolder.appendingPathComponent("\(safe).png")
+            try? FileManager.default.removeItem(at: target)
+            try FileManager.default.moveItem(at: temp, to: target)
+            slideFiles[id] = target.path
+            if let tag = http.value(forHTTPHeaderField: "ETag") { etags[id] = tag; saveEtags() }
+            return true
+        } catch { return false }
+    }
+
     @ObservationIgnored private var task: URLSessionWebSocketTask?
     @ObservationIgnored private var room = ""
     @ObservationIgnored private var fixedVenue = false
@@ -429,7 +506,9 @@ final class WordaliveFeed {
             try? FileManager.default.removeItem(at: target)
             try FileManager.default.moveItem(at: temp, to: target)
             slideFiles[id] = target.path
+            if let tag = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "ETag") { etags[id] = tag; saveEtags() }
             slidesReady = slideIDs.filter { slideFiles[$0] != nil }.count
+            storedCount += 1
             showCurrentSlide()
             return true
         } catch {
@@ -509,6 +588,8 @@ final class WordaliveFeed {
         deckTask = Task { [weak self] in
             await self?.downloadAll(ids)
             self?.deckTaskDone = true
+            // 보관함에서 꺼내 쓴 그림이 서버에서 새로 구워졌는지 확인
+            self?.revalidateStored()
         }
     }
     @ObservationIgnored private var deckTaskDone = true

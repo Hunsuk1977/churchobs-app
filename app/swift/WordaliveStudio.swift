@@ -74,6 +74,12 @@ final class WordaliveStudioHost: NSObject {
 
     func openStudio() { webView.load(URLRequest(url: Self.site.appendingPathComponent("studio"))) }
 
+    /// 스튜디오에 덱 전체를 다시 달라고 하고, 이미 받은 그림은 서버와 대조해 바뀐 것만 새로 받는다
+    func requestDeck() {
+        webView.evaluateJavaScript("window.__churchobsRequestDeck && window.__churchobsRequestDeck()") { _, _ in }
+        WordaliveFeed.shared.revalidateStored(force: true)
+    }
+
     private func watch(_ url: URL?) {
         guard let url, url.host?.hasSuffix("wordalive.app") == true else { return }
         if url.path.hasPrefix("/auth") {
@@ -264,6 +270,8 @@ final class WordaliveStudioHost: NSObject {
     setInterval(hello, 2500);
     // 덱은 처음 한 번만 받으면 된다 → 못 받았을 때만 다시 요청 (슬라이드가 바뀌면 스튜디오가 알아서 보낸다)
     setInterval(() => { if (location.pathname.startsWith('/studio') && !gotDeck) ppt.postMessage({ type: 'request-deck-refresh' }); }, 30000);
+    // 앱의 "덱 다시 받기" 버튼: 스튜디오에 덱 전체를 다시 달라고 한다
+    window.__churchobsRequestDeck = () => { gotDeck = false; ppt.postMessage({ type: 'request-deck-refresh' }); ppt.postMessage({ type: 'ready' }); };
   };
   const wait = () => { if (started) return; const id = ownerId(); if (id) start(id); else setTimeout(wait, 1500); };
   wait();
@@ -379,9 +387,16 @@ struct WordaliveStudioPane: View {
                 Spacer()
                 if !host.needsLink { SlideSignal() }
                 if !host.needsLink {
+                    SlideStoreChip()
+                    Button { host.requestDeck() } label: { Image(systemName: "square.and.arrow.down.on.square") }
+                        .help(L("덱 다시 받기 — 스튜디오의 슬라이드를 다시 받고, 보관함 그림은 서버와 대조해 바뀐 것만 새로 받습니다"))
                     Button { host.openStudio() } label: { Image(systemName: "house") }.help("스튜디오 첫 화면")
                     Button { host.reload() } label: { Image(systemName: "arrow.clockwise") }.help("새로 고침")
                     Menu {
+                        Button("덱 다시 받기") { host.requestDeck() }
+                        Button("슬라이드 보관함 폴더 열기") { NSWorkspace.shared.activateFileViewerSelecting([WordaliveFeed.storeFolder]) }
+                        Button("슬라이드 보관함 비우기", role: .destructive) { WordaliveFeed.shared.clearStore() }
+                        Divider()
                         Button("Safari에서 다시 연결") { host.startLink() }
                         Button("이 Mac에서 WORDaLIVE 연결 해제", role: .destructive) { host.unlink() }
                     } label: { Image(systemName: "ellipsis") }
@@ -435,6 +450,21 @@ private struct SlideSignal: View {
                 .font(.uiCaption2.monospacedDigit()).foregroundStyle(.secondary).lineLimit(1)
         }
         .help(L("Church OBS가 WORDaLIVE 스튜디오에서 받은 슬라이드"))
+    }
+}
+
+/// 이 Mac에 저장된 슬라이드 그림(인터넷이 끊겨도 쓸 수 있는 것)
+private struct SlideStoreChip: View {
+    @State private var feed = WordaliveFeed.shared
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: feed.revalidating ? "arrow.triangle.2.circlepath" : "internaldrive")
+                .font(.uiCaption2).foregroundStyle(.secondary)
+            Text(feed.revalidating ? L("확인 중…") : L("보관함") + " \(feed.storedCount)")
+                .font(.uiCaption2.monospacedDigit()).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .help(feed.lastRefresh.map { L("이 Mac에 저장된 슬라이드 그림 · 마지막 확인 ") + $0.formatted(date: .omitted, time: .shortened) } ?? L("이 Mac에 저장된 슬라이드 그림 (인터넷이 끊겨도 보여 줍니다)"))
+        .onAppear { feed.refreshStoredCount() }
     }
 }
 
