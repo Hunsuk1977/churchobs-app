@@ -17,7 +17,7 @@ add_executable(churchobs MACOSX_BUNDLE
   StudioControls.mm StudioControls.h StudioLayout.h
   StudioBridge.h SwiftBridge.inc GraphState.h GraphGeometry.h GraphEngine.inc
   swift/SceneModels.swift swift/ShowStore.swift swift/SceneSheets.swift
-    swift/MediaGraphicsPanels.swift swift/Typography.swift swift/Glass.swift swift/ScreenPermission.swift swift/NetworkStatus.swift swift/SceneEditorView.swift swift/LiveSceneDeck.swift swift/CanvasEditor.swift swift/StudioMonitors.swift swift/AccountService.swift swift/AccountViews.swift swift/NativeStudio.swift swift/ChurchStudioView.swift swift/WordaliveFeed.swift swift/WordaliveStudio.swift swift/SourceMonitor.swift swift/YouTubePlayer.swift swift/TextObjects.swift
+    swift/MediaGraphicsPanels.swift swift/Typography.swift swift/Glass.swift swift/ScreenPermission.swift swift/NetworkStatus.swift swift/SceneEditorView.swift swift/LiveSceneDeck.swift swift/CanvasEditor.swift swift/StudioMonitors.swift swift/AccountService.swift swift/AccountViews.swift swift/NativeStudio.swift swift/ChurchStudioView.swift swift/WordaliveFeed.swift swift/WordaliveStudio.swift swift/Materials.swift swift/SourceMonitor.swift swift/YouTubePlayer.swift swift/TextObjects.swift
   Main.mm StudioUI.inc StudioSources.inc StudioUITest.inc StudioTiming.h Engine.mm Engine.h PreviewView.mm PreviewView.h
   SmokeTest.mm SmokeTest.h FaceTracker.mm FaceTracker.h
   filters/face_geometry.c filters/face_geometry.h
@@ -55,6 +55,7 @@ target_link_libraries(churchobs PRIVATE OBS::libobs "-lc++"
   "$<LINK_LIBRARY:FRAMEWORK,Vision.framework>"
   "$<LINK_LIBRARY:FRAMEWORK,CoreVideo.framework>"
   "$<LINK_LIBRARY:FRAMEWORK,ImageIO.framework>"
+  "$<LINK_LIBRARY:FRAMEWORK,PDFKit.framework>"
   "$<LINK_LIBRARY:FRAMEWORK,CoreMedia.framework>"
   "$<LINK_LIBRARY:FRAMEWORK,CoreMediaIO.framework>"
   "$<LINK_LIBRARY:FRAMEWORK,QuickLookThumbnailing.framework>"

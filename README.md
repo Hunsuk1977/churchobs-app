@@ -2,8 +2,8 @@
 
 **교회를 위한 간편 YouTube 방송 소프트웨어 · Simple YouTube streaming for churches** — https://churchobs.app
 
-Church OBS는 OBS Studio의 영상 엔진(libobs)을 그대로 쓰면서, 준비 → 장면 → 진행 세 단계로 예배 방송을 쉽게 하도록 만든 macOS 앱입니다.
-Church OBS is a macOS app built on the OBS Studio engine (libobs) that streams worship services to YouTube in three steps: prepare → scenes → live.
+Church OBS는 OBS Studio의 영상 엔진(libobs)을 그대로 쓰면서, 준비 → 장면 → 자료 → 진행 네 단계로 예배 방송을 쉽게 하도록 만든 macOS 앱입니다.
+Church OBS is a macOS app built on the OBS Studio engine (libobs) that streams worship services to YouTube in four steps: prepare → scenes → materials → live.
 
 > 이 저장소는 GPL 의무에 따라 공개하는 **앱 소스**입니다. 계정 서버는 포함하지 않습니다.
 > This repository is the **app source**, published under the GPL. The account server is not included.
@@ -14,7 +14,7 @@ Church OBS is a macOS app built on the OBS Studio engine (libobs) that streams w
 - YouTube 방송 만들기·시작·종료, 1080p 하드웨어 인코딩(VideoToolbox)
 - 출력 창(프로젝터)에 송출과 같은 화면 또는 다른 장면
 - 영상 소리를 방송/현장 스피커로 나눠 보내기
-- WORDaLIVE 실시간 번역 자막·슬라이드 연결(선택)
+- 자료 단계: WORDaLIVE 스튜디오(슬라이드·실시간 번역 자막) · 다른 프로그램 창 가져오기 · 내장 PDF/사진 넘김기 중 선택
 
 ## 빌드 · Build (macOS 14+, Apple Silicon)
 Requirements: full **Xcode** (not just Command Line Tools), **CMake 3.28+**, git.

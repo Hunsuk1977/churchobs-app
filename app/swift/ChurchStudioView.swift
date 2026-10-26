@@ -45,7 +45,12 @@ struct ChurchStudioView: View {
                     wordalive.styleSink = { [weak owner] style in
                         _ = owner?.bridge?.studioCommand("captionStyle", arguments: style)
                     }
+                    // 슬라이드 레이어의 주인은 자료 단계에서 고른 소스. 직접 만들기를 쓰는 동안은 WORDaLIVE 슬라이드를 무시
                     wordalive.slideSink = { [weak owner] path, blank in
+                        guard MaterialsStore.shared.source != .builtin else { return }
+                        _ = owner?.bridge?.studioCommand("slide", arguments: ["path": path, "blank": blank])
+                    }
+                    MaterialsStore.shared.sink = { [weak owner] path, blank in
                         _ = owner?.bridge?.studioCommand("slide", arguments: ["path": path, "blank": blank])
                     }
                     wordalive.layoutSink = { [weak owner] layout in owner?.store.followWordaliveLayout(layout) }
@@ -77,7 +82,8 @@ struct ChurchStudioView: View {
             Divider()
             Group {
                 if session.phase == 0 { preparation }
-                else if session.phase == 1 {
+                else if session.phase == StudioSession.materials { MaterialsView(session: session) }
+                else if session.phase == StudioSession.scenes {
                     SceneEditorView(store: session.store, extraInspector: AnyView(cameraPanel(wide: false)), compositePreview: AnyView(EngineSurface(preview: preview)), sourcePreview: { _ in AnyView(Color.clear) }, audioLevel: session.audioLevel)
                         .disabled(session.locked)
                 } else { performance }
@@ -103,7 +109,7 @@ struct ChurchStudioView: View {
         }
         .sheet(isPresented: $showScenarios) {
             ScenarioLibrarySheet(account: session.account, currentTitle: session.store.title,
-                                 editable: !session.locked && session.phase != 2,
+                                 editable: !session.locked && session.phase != StudioSession.performance,
                                  onSave: { name, overwrite in await session.saveScenario(name: name, overwrite: overwrite) },
                                  onOpen: { id in await session.openScenario(id) },
                                  onLogin: { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { showLogin = true } })
@@ -120,6 +126,7 @@ struct ChurchStudioView: View {
                          live: session.flag("live"),
                          recording: session.flag("recording"),
                          locked: session.locked,
+                         materials: MaterialsStore.shared.source?.title ?? "",
                          select: session.requestPhase)
             Spacer()
             // 준비 화면은 카드가 같은 정보를 크게 보여 준다 → 헤더 칩은 장면·진행 화면에서만
@@ -313,7 +320,7 @@ struct ChurchStudioView: View {
         let summary = [preset > 0 ? L("보정") + " " + presetNames[min(preset, 2)] : nil,
                        tone > 0 ? toneNames[min(tone, 4)] : nil,
                        blur > 0 ? L("배경 흐림") + " \(Int(blur))" : nil].compactMap { $0 }
-        let controlsOff = !hasCamera || session.locked || session.phase == 2 || !pro
+        let controlsOff = !hasCamera || session.locked || session.phase == StudioSession.performance || !pro
         return VStack(alignment: .leading, spacing: 0) {
             Button {
                 withAnimation(.snappy(duration: 0.22)) { cameraPanelOpen.toggle() }
@@ -681,7 +688,7 @@ struct ChurchStudioView: View {
                 .tint(session.flag("virtualCam") ? ChurchStatus.ok : nil)
                 .disabled(!session.flag("ready"))
                 .help("송출 화면을 Zoom·Google Meet 등에서 카메라로 쓸 수 있게 합니다")
-                if session.phase == 2 {
+                if session.phase == StudioSession.performance {
                     if broadcastStep > 0 {
                         // 시작·종료에는 몇 초가 걸린다 → 누른 것이 받아들여졌다는 것을 바로 보여 준다
                         HStack(spacing: 8) {
@@ -725,6 +732,8 @@ struct PhaseStepper: View {
     let live: Bool
     let recording: Bool
     let locked: Bool
+    /// 자료 단계에 고른 소스 이름 (아직이면 빈 값)
+    var materials: String = ""
     let select: (Int) -> Void
 
     private struct Step { let number: Int; let title: String; let detail: String; let symbol: String; let done: Bool }
@@ -732,7 +741,8 @@ struct PhaseStepper: View {
     private var steps: [Step] {
         [Step(number: 1, title: L("준비"), detail: ready ? L("점검 완료") : L("카메라·마이크 점검"), symbol: "checklist", done: ready && phase > 0),
          Step(number: 2, title: "장면", detail: sceneCount > 0 ? "장면 \(sceneCount)개" : "장면 만들기", symbol: "rectangle.3.group", done: phase > 1),
-         Step(number: 3, title: L("진행"), detail: live ? L("방송 중") : recording ? L("녹화 중") : L("방송·녹화"), symbol: "dot.radiowaves.left.and.right", done: false)]
+         Step(number: 3, title: L("자료"), detail: materials, symbol: "doc.richtext", done: phase > 2 && !materials.isEmpty),
+         Step(number: 4, title: L("진행"), detail: live ? L("방송 중") : recording ? L("녹화 중") : L("방송·녹화"), symbol: "dot.radiowaves.left.and.right", done: false)]
     }
 
     var body: some View {
@@ -751,7 +761,7 @@ struct PhaseStepper: View {
         .churchGlass(ChurchShape.panel + 2)
     }
 
-    private func tint(_ index: Int) -> Color { index == 2 && (live || recording) ? .red : .accentColor }
+    private func tint(_ index: Int) -> Color { index == StudioSession.performance && (live || recording) ? .red : .accentColor }
 
     @ViewBuilder
     private func stepButton(_ step: Step, index: Int) -> some View {
@@ -775,7 +785,7 @@ struct PhaseStepper: View {
                         .opacity(active ? 0.9 : 0.6)
                         .lineLimit(1)
                 }
-                if index == 2 && (live || recording) {
+                if index == StudioSession.performance && (live || recording) {
                     Circle().fill(active ? Color.white : Color.red).frame(width: 8, height: 8)
                 }
             }

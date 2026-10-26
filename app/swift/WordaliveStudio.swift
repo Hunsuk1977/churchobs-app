@@ -373,13 +373,17 @@ final class StudioWebView: WKWebView {
 
 struct WordaliveStudioPane: View {
     var onHide: () -> Void = {}
+    /// 자료 단계: 숨기기 단추 없이 꽉 찬 화면
+    var fullscreen = false
     @State private var host = WordaliveStudioHost.shared
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Button(action: onHide) { Image(systemName: "sidebar.left") }
-                    .help(L("WORDaLIVE 스튜디오 숨기기"))
+                if !fullscreen {
+                    Button(action: onHide) { Image(systemName: "sidebar.left") }
+                        .help(L("WORDaLIVE 스튜디오 숨기기"))
+                }
                 Text("WORDaLIVE 스튜디오").font(.uiHeadline)
                 if !host.email.isEmpty, !host.needsLink {
                     Text(host.email).font(.uiCaption).foregroundStyle(.secondary).lineLimit(1)

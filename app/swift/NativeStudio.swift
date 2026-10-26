@@ -158,6 +158,10 @@ final class NativeCompositor: SceneCompositor {
 @Observable
 final class StudioSession {
     let store: ShowStore
+    /// 단계: 0 준비 · 1 장면 · 2 자료 · 3 진행
+    static let scenes = 1
+    static let materials = 2
+    static let performance = 3
     var phase = 0
     @ObservationIgnored private var projectorWasOpen = false
     var state: [String: Any] = [:]
@@ -281,7 +285,7 @@ final class StudioSession {
             let turningOff = (args["tone"] as? Int ?? 0) == 0 && (args["blur"] as? Double ?? 0) == 0
             if !turningOff { message = L("색 톤과 배경 흐림은 Pro 기능입니다. 상단 계정 메뉴에서 업그레이드할 수 있습니다."); return }
         }
-        if command == "record", !flag("recording"), phase != 2 {
+        if command == "record", !flag("recording"), phase != Self.performance {
             guard let selected = store.selectedScene, compositor.present(selected, sources: store.sources, transition: .init(style: .cut, duration: 0)) else { return }
         }
         guard bridge?.studioCommand(command, arguments: args) == true else { message = L("현재 상태에서는 이 작업을 진행할 수 없습니다."); return }
@@ -290,7 +294,7 @@ final class StudioSession {
     func requestPhase(_ next: Int) {
         guard next != phase else { return }
         if locked { message = L("방송·녹화·연결 작업을 마친 뒤 화면을 바꿀 수 있습니다."); return }
-        if next == 2 {
+        if next == Self.performance {
             guard flag("ready"), !store.scenes.isEmpty else { message = L("영상 엔진과 장면을 먼저 준비하세요."); return }
             showReview = true; return
         }
@@ -301,10 +305,10 @@ final class StudioSession {
     }
     func enterPerformance() {
         guard reviewed, !locked, bridge?.studioCommand("mode", arguments: ["performance": true]) == true else { return }
-        phase = 2; store.isInPerformanceMode = true; store.editingLocked = true
+        phase = Self.performance; store.isInPerformanceMode = true; store.editingLocked = true
         if let first = store.scenes.first { store.goLive(first.id) }
         if store.programSceneID == nil {
-            phase = 1; store.isInPerformanceMode = false; store.editingLocked = false
+            phase = Self.scenes; store.isInPerformanceMode = false; store.editingLocked = false
             _ = bridge?.studioCommand("mode", arguments: ["performance": false])
         }
     }
@@ -332,8 +336,8 @@ final class StudioSession {
         if cameraChoice.isEmpty { cameraChoice = state["cameraID"] as? String ?? "" }
         if microphoneChoice.isEmpty { microphoneChoice = state["microphoneID"] as? String ?? "" }
         if broadcastChoice.isEmpty { broadcastChoice = state["broadcastID"] as? String ?? "" }
-        if !(state["activeBroadcast"] as? String ?? "").isEmpty { phase = 2; store.isInPerformanceMode = true }
-        store.editingLocked = phase == 2 || locked
+        if !(state["activeBroadcast"] as? String ?? "").isEmpty { phase = Self.performance; store.isInPerformanceMode = true }
+        store.editingLocked = phase == Self.performance || locked
         store.broadcasting = flag("live")
         if let raw = state["sourceSizes"] as? [String: [NSNumber]] {
             var sizes: [UUID: CGSize] = [:]
@@ -364,7 +368,7 @@ final class StudioSession {
             if flag("camera"), let id = store.mainCameraSourceID, let i = store.sources.firstIndex(where: { $0.id == id }) { store.sources[i].config = .camera(deviceID: state["cameraID"] as? String) }
             if flag("microphone"), let id = store.mainMicSourceID, let i = store.sources.firstIndex(where: { $0.id == id }) { store.sources[i].config = .audio(deviceID: state["microphoneID"] as? String, appBundleID: nil) }
         }
-        if phase != 2, flag("ready"), !locked {
+        if phase != Self.performance, flag("ready"), !locked {
             if phase == 0, flag("camera"), let id = store.mainCameraSourceID {
                 let camera = ShowScene(id: preparationSceneID, name: L("카메라 점검"), items: [SceneItem(sourceID: id)])
                 compositor.updatePreview(camera, sources: store.sources)
@@ -452,7 +456,7 @@ final class StudioSession {
 
     /// 보관함에서 시나리오 열기 (편집 화면에서만)
     func openScenario(_ id: UUID) async {
-        guard !locked, phase != 2 else { message = L("방송·녹화를 마치고 장면 편집 화면에서 시나리오를 여세요."); return }
+        guard !locked, phase != Self.performance else { message = L("방송·녹화를 마치고 장면 편집 화면에서 시나리오를 여세요."); return }
         guard let result = await account.loadScenario(id) else { return }
         let previous = store.snapshot
         store.load(result.snapshot)
@@ -518,7 +522,7 @@ final class StudioSession {
         if panel.runModal() == .OK, let url = panel.url { do { try store.save(to: url) } catch { message = error.localizedDescription } }
     }
     func loadCopy() {
-        guard !locked, phase != 2 else { return }
+        guard !locked, phase != Self.performance else { return }
         let panel = NSOpenPanel(); panel.canChooseDirectories = false
         if panel.runModal() == .OK, let url = panel.url {
             let previous = store.snapshot
@@ -527,7 +531,7 @@ final class StudioSession {
         }
     }
     func toggleCountdown() {
-        guard phase == 2, let program = store.programSceneID, program == store.scenes.first?.id else { message = L("진행 화면에서 현재 장면에 카운트다운을 시작하세요."); return }
+        guard phase == Self.performance, let program = store.programSceneID, program == store.scenes.first?.id else { message = L("진행 화면에서 현재 장면에 카운트다운을 시작하세요."); return }
         if countdownRunning { pauseCountdown(); return }
         countdownTarget = program
         if countdownRemaining <= 0 || !countdownVisible { countdownRemaining = min(max(countdownMinutes, 1), 180) * 60 }
@@ -541,7 +545,7 @@ final class StudioSession {
     }
     func resetCountdown() {
         pauseCountdown(); countdownVisible = false; countdownTarget = nil; countdownRemaining = min(max(countdownMinutes, 1), 180) * 60
-        if phase == 2, let scene = store.scenes.first(where: { $0.id == store.programSceneID }) { _ = compositor.present(scene, sources: store.sources, transition: .init(style: .cut, duration: 0)) }
+        if phase == Self.performance, let scene = store.scenes.first(where: { $0.id == store.programSceneID }) { _ = compositor.present(scene, sources: store.sources, transition: .init(style: .cut, duration: 0)) }
     }
     var countdownLabel: String { String(format: "%02d:%02d", countdownRemaining / 60, countdownRemaining % 60) }
     func updateCountdown() {

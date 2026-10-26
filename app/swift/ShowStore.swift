@@ -802,15 +802,19 @@ extension ShowStore {
         var mainMicSourceID: Source.ID?
         /// 0.8.x 이전 저장 파일에는 없음
         var guides: [CanvasGuide]? = nil
+        /// 자료 단계에서 고른 소스 (wordalive · window · builtin). 이전 파일에는 없음
+        var materialsSource: String? = nil
     }
 
     var snapshot: Snapshot {
         Snapshot(title: title, sources: sources, scenes: scenes, defaultTransition: defaultTransition,
-                 mainCameraSourceID: mainCameraSourceID, mainMicSourceID: mainMicSourceID, guides: guides)
+                 mainCameraSourceID: mainCameraSourceID, mainMicSourceID: mainMicSourceID, guides: guides,
+                 materialsSource: MaterialsStore.shared.source?.rawValue)
     }
 
     func load(_ s: Snapshot) {
         title = s.title; sources = s.sources; scenes = s.scenes
+        if let raw = s.materialsSource, let source = MaterialsSource(rawValue: raw) { MaterialsStore.shared.source = source }
         defaultTransition = s.defaultTransition
         mainCameraSourceID = s.mainCameraSourceID; mainMicSourceID = s.mainMicSourceID
         guides = s.guides ?? []

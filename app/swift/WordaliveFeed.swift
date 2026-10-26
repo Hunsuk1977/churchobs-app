@@ -644,6 +644,12 @@ final class WordaliveFeed {
             return t.isEmpty ? nil : ["t": t, "s": ""]
         }
     }
+    /// 자료 소스를 WORDaLIVE로 되돌렸을 때: 지금 슬라이드를 엔진에 다시 보낸다
+    func resendSlide() {
+        lastSlideSent = ""
+        showCurrentSlide()
+    }
+
     /// 연결 해제·스튜디오 닫힘
     func localEnded() {
         localActive = false
